@@ -1,0 +1,25 @@
+{
+  "$schema": "https://raw.githubusercontent.com/grafana/grafana/master/docs/sources/developers/plugins/plugin.schema.json",
+  "type": "panel",
+  "name": "timeseries-vidsync",
+  "id": "ait-timeseriesvidsync-panel",
+  "info": {
+    "keywords": ["panel"],
+    "description": "Sync Video Playback (from URL) with Grafana TimeSeries Annotations",
+    "author": {
+      "name": "Austrian Institute of Technologies - Christian Eberherr, Michael Denk, Manuel Hofbauer"
+    },
+    "logos": {
+      "small": "img/logo.svg",
+      "large": "img/logo.svg"
+    },
+    "links": [],
+    "screenshots": [],
+    "version": "%VERSION%",
+    "updated": "%TODAY%"
+  },
+  "dependencies": {
+    "grafanaDependency": ">=9.5.3",
+    "plugins": []
+  }
+}
