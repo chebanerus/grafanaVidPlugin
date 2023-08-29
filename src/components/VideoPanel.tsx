@@ -95,7 +95,7 @@ export const VideoPanel: React.FC<Props> = ({
         //get video element from DOM
         let vid = document.getElementById("Vid_" + videoURL) as HTMLVideoElement | null;
 
-        //Define video Callback handler Function (updates every frame in supported browsers)
+        //Define video Callback handler Function (sends new DataHoverEvent on every frame in supported browsers)
         const funcToHandle = () => {
             eventBus?.publish({
                 type: DataHoverEvent.type,
@@ -108,6 +108,7 @@ export const VideoPanel: React.FC<Props> = ({
             });
             vid?.requestVideoFrameCallback(funcToHandle);
         };
+        //if vid is available -> set currentTime to clicked position
         if (vid) {
             if (timeObj.current.playbackTime) {
                 vid.currentTime = timeObj.current.playbackTime * vid.duration;
@@ -118,10 +119,13 @@ export const VideoPanel: React.FC<Props> = ({
         };
         let publishEventLeave = function () {
         };
+
         let intervalID: string | number | NodeJS.Timeout | undefined;
+        //check if browser supports requestVideoFrameCallback
         if ('requestVideoFrameCallback' in HTMLVideoElement.prototype) {
             vid?.requestVideoFrameCallback(funcToHandle);
         } else {
+            //if browser does not support VideoFrameCallback - update Timestamp all 15ms when mouse hovers over video panel (Syncs)
             publishEventLeave = function () {
                 clearInterval(intervalID);
                 eventBus?.publish({
@@ -162,7 +166,7 @@ export const VideoPanel: React.FC<Props> = ({
                 }, 15);
             }
         }
-
+        //return wrapper with specified Events and video container
         return (
             <div
                 className={cx(
@@ -220,6 +224,7 @@ interface SeriesData {
 }
 function updateTime (data: unknown, timeRange: TimeRange, time: number) {
     let playbackTime: number | null, timespan: number | null = null, tfrom = 0, tto = 0;
+    //DATA is Data from Annotations! If no data is present or if the datasource of the panel is not configured as the annotations of the u-plot associated, this plugin will malfunction!
     let dat = data as unknown as SeriesData;
     if (dat.series && dat.series[0]) {
         console.log(dat.series[0]);
