@@ -5,7 +5,7 @@ import {
     LoadingState,
     Field,
     Vector,
-    TimeRange,
+    TimeRange, DataHoverClearEvent,
     //,DashboardCursorSync
 } from '@grafana/data';
 import {css, cx} from '@emotion/css';
@@ -40,11 +40,15 @@ export const VideoPanel: React.FC<Props> = ({
         //const timezones = useMemo(() => getTimezones(options.timezone, timeZone), [options.timezone, timeZone]); // -> not needed
         //create OnClick-Handler
         useEffect(() => {
-            //create subscriber to DataHoverEvents (because all timeseries may not have been loaded once this plugin finished loading)
+            //create subscriber to DataHoverEvents (because all timeseries may not have been loaded once this plugin finished loading, the onClick-Effect gets added on the first DataHoverEvent)
             const subscriber = eventBus.getStream(DataHoverEvent).subscribe(() => {
                 //find class u-over (Class of all timeseries) via jquery, then add onclick function to set Time (gotten from Tooltip) on State (triggers Re-Render)
                 ($(document.body)).find(".u-over").on("click", function () {
                     //console.log(($("#grafana-portal-container")).find('[aria-label="Timestamp"]').html());
+                    //update Time Variable to set it to current Position shown from Timestamp !!!! - Without Timestamp enabled, this does not work - so the plugin doesn't work then either.
+                    //This could theoretically be fixed by using a time RefHook (that updates on DataHover (datahover includes position)
+                    // -> on every position before a click) and then just sets itself to the state onclick
+                    //TODO
                     setTime(Date.parse(($("#grafana-portal-container")).find('[aria-label="Timestamp"]').html()));
                 });
                 subscriber.unsubscribe();
@@ -55,6 +59,7 @@ export const VideoPanel: React.FC<Props> = ({
         }, [eventBus]);
 
         useEffect(() => {
+            //needed Subscriber because else plugin malfunctions after "Edit Plugin" is used
             const subscriber = eventBus.getStream(ThemeChangedEvent).subscribe(() => {
                 timeObj.current = updateTime(data, timeRange, time);
                 });
@@ -63,7 +68,7 @@ export const VideoPanel: React.FC<Props> = ({
             }
         }, [eventBus, data,time,timeRange]);
 
-        //Zukunftsmusik: Follow Arrow
+        //Zukunftsmusik: Follow Arrow TODO -> As stated above, this was one idea to follow every DataHoverEvent, but is Obsolete and unusable! (Does not use RefHook)
         /*useEffect(() => {
             const subscriber = eventBus.getStream(DataHoverEvent).subscribe(event => {
                 let t;
@@ -82,10 +87,15 @@ export const VideoPanel: React.FC<Props> = ({
             }
         });*/
 
+        //timeObject is set to Return value of updateTime -> updateTime sets Time according to Annotation borders and syncs video playback around it. Does not care about seconds / real-time yet. Can easily be programmed to do so - just by removing one border (tfrom or tto) and then calculating from video duration instead of between the borders
         timeObj.current = updateTime(data, timeRange, time);
 
     //console.log(playbackTime);
+
+        //get video element from DOM
         let vid = document.getElementById("Vid_" + videoURL) as HTMLVideoElement | null;
+
+        //Define video Callback handler Function (updates every frame in supported browsers)
         const funcToHandle = () => {
             eventBus?.publish({
                 type: DataHoverEvent.type,
@@ -114,6 +124,15 @@ export const VideoPanel: React.FC<Props> = ({
         } else {
             publishEventLeave = function () {
                 clearInterval(intervalID);
+                eventBus?.publish({
+                    type: DataHoverClearEvent.type,
+                    payload: {
+                        point: {
+                            time: (vid?.currentTime && vid?.duration && timeObj.current.timespan) ? timeObj.current.tfrom + (vid?.currentTime / vid?.duration) * timeObj.current.timespan : 0,
+                            x: null,
+                        },
+                    },
+                });
             }
             ;
             publishEventEnter = function () {
