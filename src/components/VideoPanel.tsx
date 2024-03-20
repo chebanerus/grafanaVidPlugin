@@ -35,10 +35,22 @@ export const VideoPanel: React.FC<Props> = ({
         const [time, setTime] = useState(Date.now);
         //create React RefHook for TimeObject (RefHooks do not re-render on update of value)
         const timeObj=useRef(updateTime(data,timeRange,time));
+
+        const timeRef=useRef(-1);
+        timeRef.current=-2;
         //if videoURL !== true -> String Empty, avoid null value
         let videoURL = replaceVariables(options.videoURL || '');
         //const timezones = useMemo(() => getTimezones(options.timezone, timeZone), [options.timezone, timeZone]); // -> not needed
         //create OnClick-Handler
+
+        eventBus.getStream(DataHoverEvent).subscribe(x=>{
+            // console.log("Payload Point Time")
+            // console.log(vid?.currentTime);
+            // console.log(x.payload.point["time"]);
+            // console.log(timeObj.current)
+            // console.log(timeRef.current)
+            timeRef.current=x.payload.point["time"];
+        });
         useEffect(() => {
             //create subscriber to DataHoverEvents (because all timeseries may not have been loaded once this plugin finished loading, the onClick-Effect gets added on the first DataHoverEvent)
             const subscriber = eventBus.getStream(DataHoverEvent).subscribe(() => {
@@ -49,7 +61,7 @@ export const VideoPanel: React.FC<Props> = ({
                     //This could theoretically be fixed by using a time RefHook (that updates on DataHover (datahover includes position)
                     // -> on every position before a click) and then just sets itself to the state onclick
                     //TODO
-                    setTime(Date.parse(($("#grafana-portal-container")).find('[aria-label="Timestamp"]').html()));
+                    setTime(timeRef.current);
                 });
                 subscriber.unsubscribe();
             })
@@ -101,7 +113,7 @@ export const VideoPanel: React.FC<Props> = ({
                 type: DataHoverEvent.type,
                 payload: {
                     point: {
-                        time: (vid?.currentTime && vid?.duration && timeObj.current.timespan) ? timeObj.current.tfrom + (vid?.currentTime / vid?.duration) * timeObj.current.timespan : 0,
+                        time: (vid?.currentTime && vid?.duration && timeObj.current.tfrom) ? timeObj.current.tfrom + vid?.currentTime*1000 : 0,
                         x: null,
                     },
                 },
@@ -111,7 +123,7 @@ export const VideoPanel: React.FC<Props> = ({
         //if vid is available -> set currentTime to clicked position
         if (vid) {
             if (timeObj.current.playbackTime) {
-                vid.currentTime = timeObj.current.playbackTime * vid.duration;
+                vid.currentTime = timeObj.current.playbackTime;
             }
 
         }
@@ -132,7 +144,7 @@ export const VideoPanel: React.FC<Props> = ({
                     type: DataHoverClearEvent.type,
                     payload: {
                         point: {
-                            time: (vid?.currentTime && vid?.duration && timeObj.current.timespan) ? timeObj.current.tfrom + (vid?.currentTime / vid?.duration) * timeObj.current.timespan : 0,
+                            time: (vid?.currentTime && vid?.duration && timeObj.current.tfrom) ? timeObj.current.tfrom + vid?.currentTime*1000 : 0,
                             x: null,
                         },
                     },
@@ -144,7 +156,7 @@ export const VideoPanel: React.FC<Props> = ({
                     type: DataHoverEvent.type,
                     payload: {
                         point: {
-                            time: (vid?.currentTime && vid?.duration && timeObj.current.timespan) ? timeObj.current.tfrom + (vid?.currentTime / vid?.duration) * timeObj.current.timespan : 0,
+                            time: (vid?.currentTime && vid?.duration && timeObj.current.tfrom) ? timeObj.current.tfrom + vid?.currentTime*1000 : 0,
                             x: null,
                         },
                     },
@@ -155,7 +167,7 @@ export const VideoPanel: React.FC<Props> = ({
                         type: DataHoverEvent.type,
                         payload: {
                             point: {
-                                time: (vid?.currentTime && vid?.duration && timeObj.current.timespan) ? timeObj.current.tfrom + (vid?.currentTime / vid?.duration) * timeObj.current.timespan : 0,
+                                time: (vid?.currentTime && vid?.duration && timeObj.current.tfrom) ? timeObj.current.tfrom + vid?.currentTime*1000 : 0,
                                 x: null,
                             },
                         },
@@ -223,7 +235,7 @@ interface SeriesData {
 
 }
 function updateTime (data: unknown, timeRange: TimeRange, time: number) {
-    let playbackTime: number | null, timespan: number | null = null, tfrom = 0, tto = 0;
+    let playbackTime: number | null,  tfrom = 0;
     //DATA is Data from Annotations! If no data is present or if the datasource of the panel is not configured as the annotations of the u-plot associated, this plugin will malfunction!
     let dat = data as unknown as SeriesData;
     if (dat.series && dat.series[0]) {
@@ -233,17 +245,11 @@ function updateTime (data: unknown, timeRange: TimeRange, time: number) {
                 if (dat.series[0]["source"][i]["tags"].includes("automatedTimeStartAnnotation")) {
                     tfrom = dat.series[0]["source"][i]["time"];
                 }
-                if (dat.series[0]["source"][i]["tags"].includes("automatedTimeStopAnnotation")) {
-                    tto = dat.series[0]["source"][i]["time"];
-                }
             }
         } else if (dat.series[0]["fields"][5]) {
             for (let i = 0; i < dat.series[0].length; i++) {
                 if (dat.series[0]["fields"][5].values[i].includes("automatedTimeStartAnnotation")) {
                     tfrom = dat.series[0]["fields"][2].values[i];
-                }
-                if (dat.series[0]["fields"][5].values[i].includes("automatedTimeStopAnnotation")) {
-                    tto = dat.series[0]["fields"][2].values[i];
                 }
             }
         }
@@ -252,21 +258,14 @@ function updateTime (data: unknown, timeRange: TimeRange, time: number) {
         //console.log(dat);
     }
 //console.log(timeRange);
-    if (!(tfrom && tto)) {
+    if (!tfrom) {
         tfrom = timeRange.from as unknown as number;
-        tto = timeRange.to as unknown as number;
     }
-//console.log(tto - tfrom);
-    timespan = tto - tfrom;
-    playbackTime = ((time - tfrom) / timespan);
-    if (tto === 0 || tfrom === 0) {
-        playbackTime = 0;
-    }
+    playbackTime = (time - tfrom)/1000;
+    console.log(playbackTime);
     let times = {
         "playbackTime":playbackTime,
         "tfrom":tfrom,
-        "tto":tto,
-        "timespan":timespan
     }
     return (times);
 }
